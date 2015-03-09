@@ -50,10 +50,9 @@ for o, a in opts:
 if dryRun:
     print "DRY RUN!!! (set directory argument for real update)"
 
-
-confs = glob.glob(os.path.join(basePath, '*', "setup.conf"))
-
 class LazyApiConnect:
+    #primitive singleton giving API connection when needed
+
     def __init__(self, consumer_key, consumer_secret, access_key, access_secret):
         self.consumer_key = consumer_key
         self.consumer_secret = consumer_secret
@@ -72,7 +71,12 @@ class LazyApiConnect:
     #enddef
 #endclass
 
+
+confs = glob.glob(os.path.join(basePath, '*', "setup.conf"))
+
+# iterate directories/confs
 for confPath in confs:
+    # TODO: fork here?
     if dryRun:
         print confPath
     cfg = ConfigParser.ConfigParser()
@@ -85,6 +89,7 @@ for confPath in confs:
 
     ownName = conn.getApi().auth.get_username()
 
+    # random favorite
     section = 'favorite'
     if cfg.has_section(section) and cfg.getfloat(section, 'probability') > random.random():
         queries = []
@@ -195,7 +200,7 @@ for confPath in confs:
         #endif
     #endif
 
-
+    # tweeting
     section = 'tweet'
     if cfg.has_section(section):
         # timed

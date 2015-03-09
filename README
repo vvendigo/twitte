@@ -4,6 +4,9 @@ Tweepy version 3.1.0 needed.
 
 Can handle multiple accounts.
 
+authorize.py - util to obtain user approval for twitte
+./authorize.py instance_example
+
 Crontab example:
 # different frequencies used to mimic human behaviour ;)
 

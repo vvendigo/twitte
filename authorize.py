@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+# Use to gain user aproval for twitte app.
+
 import tweepy
 import sys
 import ConfigParser
