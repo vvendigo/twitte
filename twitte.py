@@ -1,7 +1,5 @@
 #!/usr/bin/python
 
-#twitte-bot.com
-
 import os, sys
 import tweepy
 import json
