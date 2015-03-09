@@ -1,8 +1,11 @@
 Twitte - simple Twitter bot using Tweepy
 
+Can favorite tweets from given searches.
+Can tweet random or timed prepared tweets.
+Can handle multiple accounts.
+
 Tweepy version >=3.1.0 needed.
 
-Can handle multiple accounts.
 
 authorize.py - util to obtain user approval for Twitte
 ./authorize.py instance_example
