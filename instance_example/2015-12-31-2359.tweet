@@ -1,0 +1,1 @@
+Files named like %Y-%m-%d-%H%M.tweet are tweeted when given time passes. They are deleted afterwards.
