@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+#twitte-bot.com
+
 import os, sys
 import tweepy
 import json
@@ -48,9 +50,8 @@ for o, a in opts:
 if dryRun:
     print "DRY RUN!!! (set directory argument for real update)"
 
-class LazyApiConnect:
-    #primitive singleton giving API connection when needed
 
+class LazyApiConnect:
     def __init__(self, consumer_key, consumer_secret, access_key, access_secret):
         self.consumer_key = consumer_key
         self.consumer_secret = consumer_secret
@@ -70,11 +71,36 @@ class LazyApiConnect:
 #endclass
 
 
+def search(querySetup, since):
+    queries = []
+    for q in querySetup.split(','):
+        q = q.strip()
+        cnt = 20
+        lang = 'en'
+        p = q.rfind('[')
+        if p>=0:
+            cnt, lang = q[p+1:-1].split(' ')
+            q = q[:p]
+        query = {'query':q, 'count':int(cnt), 'lang':lang}
+        if dryRun: print query
+        queries.append(query)
+    #endfor
+    out = []
+    for query in queries:
+        q = '%s since:%s'%(query['query'], since)
+        res = conn.getApi().search(q, count=query['count'], lang=query['lang'], result_type='recent')
+        # since_id??
+        for tweet in res:
+            out.append(tweet)
+    #endfor
+    return out
+#enddef
+
+
+
 confs = glob.glob(os.path.join(basePath, '*', "setup.conf"))
 
-# iterate directories/confs
 for confPath in confs:
-    # TODO: fork here?
     if dryRun:
         print confPath
     cfg = ConfigParser.ConfigParser()
@@ -85,24 +111,9 @@ for confPath in confs:
     conn = LazyApiConnect(cfg.get(section, 'consumer_key'), cfg.get(section, 'consumer_secret'), \
                         cfg.get(section, 'access_key'), cfg.get(section, 'access_secret'))
 
-    ownName = conn.getApi().auth.get_username()
-
-    # random favorite
+#### FAVORITE
     section = 'favorite'
     if cfg.has_section(section) and cfg.getfloat(section, 'probability') > random.random():
-        queries = []
-        for q in cfg.get(section, 'query').split(','):
-            q = q.strip()
-            cnt = 20
-            lang = 'en'
-            p = q.rfind('[')
-            if p>=0:
-                cnt, lang = q[p+1:-1].split(' ')
-                q = q[:p]
-            query = {'query':q, 'count':int(cnt), 'lang':lang}
-            if dryRun: print query
-            queries.append(query)
-        #endfor
 
         max_favorites = None
         if cfg.has_option(section, 'max_favorites'):
@@ -126,43 +137,39 @@ for confPath in confs:
 
         tweets = []
         i = 0
+        ownName = conn.getApi().auth.get_username()
 
-        for query in queries:
-            q = '%s since:%s'%(query['query'],time.strftime('%Y-%m-%d'))
-            res = conn.getApi().search(q, count=query['count'], lang=query['lang'], result_type='recent')
-            # since_id??
-            for tweet in res:
-                if tweet.retweeted or tweet.favorited or tweet.user.screen_name==ownName:
-                    #print tweet.retweeted, tweet.favorited, tweet.user.screen_name
-                    continue
-                tweet.score = tweetScorer.getScore(tweet)
-                uKey = tweetScorer.normalizeText(tweet)
-                uUsr = tweet.user.screen_name
-                #print "'%s'"%uKey
-                if uniq.has_key(uKey):
-                    if uniq[uKey].score < tweet.score:
-                        uniq[uKey].score = -1
-                        uniq[uKey] = tweet
-                        if not uniqUsers.has_key(uUsr):
-                            uniqUsers[uUsr] = tweet
-                    else:
-                        tweet.score = -666
-                elif uniqUsers.has_key(uUsr):
-                    if uniqUsers[uUsr].score < tweet.score:
-                        uniqUsers[uUsr].score = -1
-                        uniqUsers[uUsr] = tweet
-                        uniq[uKey] = tweet
-                    else:
-                        tweet.score = -666
-                else:
+        for tweet in search(cfg.get(section, 'query'), time.strftime('%Y-%m-%d')):
+            if tweet.retweeted or tweet.favorited or tweet.user.screen_name==ownName:
+                #print tweet.retweeted, tweet.favorited, tweet.user.screen_name
+                continue
+            tweet.score = tweetScorer.getScore(tweet)
+            uKey = tweetScorer.normalizeText(tweet)
+            uUsr = tweet.user.screen_name
+            #print "'%s'"%uKey
+            if uniq.has_key(uKey):
+                if uniq[uKey].score < tweet.score:
+                    uniq[uKey].score = -1
                     uniq[uKey] = tweet
+                    if not uniqUsers.has_key(uUsr):
+                        uniqUsers[uUsr] = tweet
+                else:
+                    tweet.score = -666
+            elif uniqUsers.has_key(uUsr):
+                if uniqUsers[uUsr].score < tweet.score:
+                    uniqUsers[uUsr].score = -1
                     uniqUsers[uUsr] = tweet
+                    uniq[uKey] = tweet
+                else:
+                    tweet.score = -666
+            else:
+                uniq[uKey] = tweet
+                uniqUsers[uUsr] = tweet
 
-                tweets.append(tweet)
-                i += 1
-                #tweetScorer.printTweet(tweet)
-                #print
-            #endfor
+            tweets.append(tweet)
+            i += 1
+            #tweetScorer.printTweet(tweet)
+            #print
         #endfor
 
         tweetScorer.sort(tweets)
@@ -198,7 +205,8 @@ for confPath in confs:
         #endif
     #endif
 
-    # tweeting
+
+#### TWEET
     section = 'tweet'
     if cfg.has_section(section):
         # timed
@@ -234,6 +242,39 @@ for confPath in confs:
                     os.remove(tf)
             #endif
         #endif
+    #endif
+
+
+#### REPLY
+    section = 'reply'
+    if cfg.has_section(section) and cfg.getfloat(section, 'probability') > random.random():
+
+        usersReplyed = set()
+        for tweet in conn.getApi().user_timeline(count=50):
+            usersReplyed.add(tweet.in_reply_to_screen_name)
+        #endfor
+
+        for tweet in search(cfg.get(section, 'query'), time.strftime('%Y-%m-%d')):
+            if dryRun: tweetScorer.printTweet(tweet)
+            if tweet.__dict__.get('retweeted_status') != None:
+                if dryRun: print "RT......."
+                continue
+            if tweet.in_reply_to_screen_name != None:
+                if dryRun: print "Reply......."
+                continue
+            if tweet.user.screen_name in usersReplyed:
+                if dryRun: print "ALREADY......."
+                continue
+            print 'Reply:', accountId, tweet.user.screen_name
+            if dryRun:
+                break
+            try:
+                conn.getApi().update_status("@%s %s"%(tweet.user.screen_name, random.choice(cfg.get(section,'phrases').decode('utf-8').split('|')).strip()), in_reply_to_status_id=tweet.id_str)
+
+                break
+            except:
+                #raise
+                print "ERR?"
     #endif
 
 #endfor
