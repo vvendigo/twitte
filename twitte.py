@@ -1,7 +1,5 @@
 #!/usr/bin/python
 
-#twitte-bot.com
-
 import os, sys
 import tweepy
 import json
@@ -52,6 +50,7 @@ if dryRun:
 
 
 class LazyApiConnect:
+    ''' "Singleton" giving API connection when needed '''
     def __init__(self, consumer_key, consumer_secret, access_key, access_secret):
         self.consumer_key = consumer_key
         self.consumer_secret = consumer_secret
@@ -70,7 +69,7 @@ class LazyApiConnect:
     #enddef
 #endclass
 
-
+# search performing function
 def search(querySetup, since):
     queries = []
     for q in querySetup.split(','):
@@ -97,12 +96,14 @@ def search(querySetup, since):
 #enddef
 
 
-
+# iterate directories/confs
 confs = glob.glob(os.path.join(basePath, '*', "setup.conf"))
 
 for confPath in confs:
+    # TODO: fork here?
     if dryRun:
         print confPath
+    # connection setup
     cfg = ConfigParser.ConfigParser()
     cfg.read(confPath)
     directory = os.path.dirname(confPath)
@@ -216,7 +217,6 @@ for confPath in confs:
         for tf in tweetFiles:
             #print tf
             t = tf[-10:-6]
-            #print t, time.strftime('%H%M')
             if t <= time.strftime('%H%M'):
                 msg = file(tf).read().decode('utf-8').strip()
                 print 'Timed tweet:', accountId, tf, msg.encode('utf-8', 'ignore')
