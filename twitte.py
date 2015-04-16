@@ -70,7 +70,7 @@ class LazyApiConnect:
 #endclass
 
 # search performing function
-def search(querySetup, since):
+def search(conn, querySetup, since):
     queries = []
     for q in querySetup.split(','):
         q = q.strip()
@@ -140,7 +140,7 @@ for confPath in confs:
         i = 0
         ownName = conn.getApi().auth.get_username()
 
-        for tweet in search(cfg.get(section, 'query'), time.strftime('%Y-%m-%d')):
+        for tweet in search(conn, cfg.get(section, 'query'), time.strftime('%Y-%m-%d')):
             if tweet.retweeted or tweet.favorited or tweet.user.screen_name==ownName:
                 #print tweet.retweeted, tweet.favorited, tweet.user.screen_name
                 continue
@@ -254,27 +254,28 @@ for confPath in confs:
             usersReplyed.add(tweet.in_reply_to_screen_name)
         #endfor
 
-        for tweet in search(cfg.get(section, 'query'), time.strftime('%Y-%m-%d')):
-            if dryRun: tweetScorer.printTweet(tweet)
+        errCnt = 0
+        for tweet in search(conn, cfg.get(section, 'query'), time.strftime('%Y-%m-%d')):
+            #if dryRun: tweetScorer.printTweet(tweet)
             if tweet.__dict__.get('retweeted_status') != None:
-                if dryRun: print "RT......."
                 continue
             if tweet.in_reply_to_screen_name != None:
-                if dryRun: print "Reply......."
                 continue
             if tweet.user.screen_name in usersReplyed:
-                if dryRun: print "ALREADY......."
                 continue
             print 'Reply:', accountId, tweet.user.screen_name
             if dryRun:
                 break
             try:
                 conn.getApi().update_status("@%s %s"%(tweet.user.screen_name, random.choice(cfg.get(section,'phrases').decode('utf-8').split('|')).strip()), in_reply_to_status_id=tweet.id_str)
-
                 break
             except:
-                #raise
                 print "ERR?"
+                errCnt += 1
+                if errCnt > 10:
+                    raise
+            #endtry
+        #endfor
     #endif
 
 #endfor
